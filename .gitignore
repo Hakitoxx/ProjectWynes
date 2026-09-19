@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Packaging / build output
+build/
+dist/
+*.spec
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Secrets and environment
+.env
+.env.*
+*.key
+*.pem
+
+# OS / temp
+Thumbs.db
