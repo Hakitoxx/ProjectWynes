@@ -80,20 +80,19 @@ class TestInfrastructure(unittest.TestCase):
         result = guard_exceptions(lambda **_kw: expected)
         self.assertIs(result, expected)
 
-    def test_manager_lists_tools_with_status(self):
+    def test_manager_lists_all_tools_with_status(self):
         manager = ToolManager()
         entries = manager.all_entries()
-        self.assertGreaterEqual(len(entries), 1)
+        self.assertEqual(len(entries), 11)  # the full v1.2.0 tool suite
         for entry in entries:
             self.assertIsNotNone(entry.availability)
             self.assertTrue(entry.tool.name)
 
-    def test_manager_blocks_planned_tools(self):
+    def test_manager_ready_for_builtin_tools(self):
         manager = ToolManager()
-        planned = [e for e in manager.all_entries() if e.planned]
-        self.assertTrue(planned, "expected at least one planned tool entry")
-        for entry in planned:
-            self.assertIsNotNone(manager.ensure_ready(entry.tool))
+        for entry in manager.all_entries():
+            if type(entry.tool) is DnsLookupTool:
+                self.assertIsNone(manager.ensure_ready(entry.tool))
 
 
 if __name__ == "__main__":

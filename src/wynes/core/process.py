@@ -10,8 +10,9 @@ Rules enforced here for every external tool wrapped by Wynes:
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Sequence
 
 from wynes.core.tool_base import ToolResult, ToolStatus
 
@@ -30,24 +31,54 @@ class ProcessResult:
     timed_out: bool = False
 
 
+def decode_console_bytes(data: bytes) -> str:
+    """Decode console output robustly.
+
+    Console utilities write in the machine's *OEM* code page (e.g. cp857 on
+    a Turkish Windows), not necessarily in UTF-8 or the ANSI code page.
+    Trying UTF-8 first, then the OEM code page, keeps structured markers
+    intact and never raises.
+    """
+    if not data:
+        return ""
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    encoding = ""
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+
+            encoding = f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+        except Exception:
+            encoding = ""
+    if encoding:
+        try:
+            return data.decode(encoding, errors="replace")
+        except LookupError:
+            pass
+    return data.decode("utf-8", errors="replace")
+
+
 def run_process(args: Sequence[str], timeout: int = DEFAULT_TIMEOUT) -> ProcessResult:
     """Run ``args`` without a shell and capture its output.
 
-    Never raises for ordinary process failures; timeouts and spawn errors
-    surface as exceptions which :func:`guard_exceptions` converts into a
-    ``ToolResult``.
+    Output is captured as bytes and decoded with :func:`decode_console_bytes`
+    so localized console tools can never crash the reader with a codec error.
+    Timeouts and spawn errors surface as exceptions which
+    :func:`guard_exceptions` converts into a ``ToolResult``.
     """
     completed = subprocess.run(
         list(args),
-        capture_output=True,
-        text=True,
+        capture_output=True,  # bytes; decoded manually below
         timeout=timeout,
         creationflags=_CREATION_FLAGS,
     )
     return ProcessResult(
         returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
+        stdout=decode_console_bytes(completed.stdout or b""),
+        stderr=decode_console_bytes(completed.stderr or b""),
     )
 
 
@@ -57,35 +88,37 @@ def guard_exceptions(fn, **kwargs) -> ToolResult:
     This is the single place where worker-thread exceptions become
     user-readable tool failures instead of crashing the application.
     """
+    from wynes.core.i18n import tr
+
     try:
         return fn(**kwargs)
     except subprocess.TimeoutExpired:
         return ToolResult(
             status=ToolStatus.TIMEOUT,
-            summary="Operation timed out",
-            error="The operation did not finish within the allowed time.",
+            summary=tr("state.timeout.summary"),
+            error=tr("state.timeout.detail"),
         )
     except PermissionError as exc:
         return ToolResult(
             status=ToolStatus.ERROR,
-            summary="Permission denied",
+            summary=tr("error.permission.summary"),
             error=str(exc),
         )
     except FileNotFoundError as exc:
         return ToolResult(
             status=ToolStatus.ERROR,
-            summary="Required executable not found",
-            error=str(exc),
+            summary=tr("error.missing_executable.summary"),
+            error=tr("error.missing_executable.detail", detail=str(exc)),
         )
     except OSError as exc:
         return ToolResult(
             status=ToolStatus.ERROR,
-            summary="Operating system error",
+            summary=tr("error.os.summary"),
             error=str(exc),
         )
     except Exception as exc:  # last line of defence: report, never crash
         return ToolResult(
             status=ToolStatus.ERROR,
-            summary="Unexpected error",
+            summary=tr("error.unexpected.summary"),
             error=f"{type(exc).__name__}: {exc}",
         )

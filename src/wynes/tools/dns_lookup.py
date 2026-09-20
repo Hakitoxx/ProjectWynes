@@ -1,8 +1,9 @@
 """DNS lookup tool.
 
 Resolves host names to IPv4/IPv6 addresses and performs reverse (PTR)
-lookups for IP address input. Implemented with the Python standard
-library (blocking ``socket`` calls) executed inside the UI worker pool.
+lookups for IP address input. Uses only the standard library: blocking
+``socket`` calls run inside the UI worker pool, wrapped with a timeout
+via a thread pool.
 
 No external dependencies, no elevated privileges required.
 """
@@ -12,101 +13,87 @@ import ipaddress
 import socket
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
+from wynes.core.i18n import tr
 from wynes.core.tool_base import (
     Availability,
     InputField,
     Tool,
     ToolResult,
     ToolStatus,
-    ValidationError,
 )
+from wynes.core.validators import normalize_target, validate_target
 
 _DNS_TIMEOUT = 5.0
-_HOSTNAME_MAX_LENGTH = 253
+
+
+def _resolve_with_timeout(func, argument, timeout: float):
+    """Run a blocking resolver call with a hard timeout."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(func, argument)
+        return future.result(timeout=timeout)
 
 
 class DnsLookupTool(Tool):
-    name = "DNS Lookup"
-    description = "Resolve host names to IP addresses and perform reverse (PTR) lookups."
-    category = "Network"
-    version = "1.0"
+    name_key = "tool.dns.name"
+    description_key = "tool.dns.description"
+    category_key = "category.network"
+    version = "1.2"
     input_fields = (
         InputField(
             key="target",
-            label="Host name or IP address",
-            placeholder="example.com  or  93.184.216.34",
+            label_key="tool.dns.field.target.label",
+            placeholder_key="tool.dns.field.target.placeholder",
         ),
         InputField(
             key="reverse",
-            label="Include reverse lookup (PTR) for IP addresses",
+            label_key="tool.dns.field.reverse.label",
             kind="checkbox",
             default=True,
         ),
     )
 
     def availability(self) -> tuple:
-        return Availability.READY, "Built-in (Python standard library)"
+        return Availability.READY, tr("tool.dns.available")
 
     # ------------------------------------------------------------- validation
     def validate(self, **inputs) -> list:
-        target = str(inputs.get("target", "")).strip()
-        if not target:
-            return [ValidationError("Enter a host name or IP address.", field="target")]
-        if len(target) > _HOSTNAME_MAX_LENGTH:
-            return [ValidationError("Input is too long (maximum 253 characters).", field="target")]
-        try:
-            ipaddress.ip_address(target)
-            return []  # valid IP address
-        except ValueError:
-            pass
-        allowed = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
-        if any(char not in allowed for char in target):
-            return [
-                ValidationError(
-                    "Host names may only contain letters, digits, dots and hyphens.",
-                    field="target",
-                )
-            ]
-        return []
+        return validate_target(inputs.get("target", ""))
 
     # ------------------------------------------------------------- execution
     def run(self, **inputs) -> ToolResult:
-        target = str(inputs.get("target", "")).strip()
+        target = normalize_target(inputs.get("target", ""))
         try:
-            addresses = ipaddress.ip_address(target)
+            ipaddress.ip_address(target)
         except ValueError:
-            addresses = None
-
-        if addresses is not None:
-            return self._run_for_ip(target, bool(inputs.get("reverse", True)))
-        return self._run_for_hostname(target)
+            return self._run_for_hostname(target)
+        return self._run_for_ip(target, bool(inputs.get("reverse", True)))
 
     def _run_for_hostname(self, hostname: str) -> ToolResult:
         try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(socket.getaddrinfo, hostname, None)
-                records = future.result(timeout=_DNS_TIMEOUT)
+            records = _resolve_with_timeout(
+                lambda host: socket.getaddrinfo(host, None), hostname, _DNS_TIMEOUT
+            )
         except FutureTimeout:
             return ToolResult(
                 status=ToolStatus.TIMEOUT,
-                summary="DNS resolution timed out",
-                error=f'No answer within {int(_DNS_TIMEOUT)} seconds for "{hostname}".',
+                summary=tr("dns.timeout.summary"),
+                error=tr("dns.timeout.detail", host=hostname, timeout=int(_DNS_TIMEOUT)),
             )
         except socket.gaierror as exc:
             return ToolResult(
                 status=ToolStatus.ERROR,
-                summary="Name resolution failed",
-                error=f'"{hostname}" could not be resolved: {exc.strerror or exc}',
+                summary=tr("dns.resolution_failed"),
+                error=tr("dns.resolution_failed_detail", host=hostname, reason=exc.strerror or exc),
             )
 
         ipv4 = sorted({record[4][0] for record in records if record[0] == socket.AF_INET})
         ipv6 = sorted({record[4][0] for record in records if record[0] == socket.AF_INET6})
 
-        data = [("Query", [("Host name", hostname)])]
+        data = [(tr("dns.section.query"), [(tr("dns.host_name"), hostname)])]
         if ipv4:
-            data.append(("IPv4 Addresses (A)", [(str(i + 1), value) for i, value in enumerate(ipv4)]))
+            data.append((tr("dns.section.ipv4"), [(str(i + 1), value) for i, value in enumerate(ipv4)]))
         if ipv6:
-            data.append(("IPv6 Addresses (AAAA)", [(str(i + 1), value) for i, value in enumerate(ipv6)]))
+            data.append((tr("dns.section.ipv6"), [(str(i + 1), value) for i, value in enumerate(ipv6)]))
 
         canonical = ""
         try:
@@ -114,7 +101,7 @@ class DnsLookupTool(Tool):
         except OSError:
             pass
         if canonical and canonical != hostname:
-            data.append(("Canonical Name", [("FQDN", canonical)]))
+            data.append((tr("dns.section.canonical"), [(tr("dns.fqdn"), canonical)]))
 
         raw_lines = [f"host: {hostname}", "ipv4:"] + [f"  {ip}" for ip in ipv4]
         raw_lines += ["ipv6:"] + [f"  {ip}" for ip in ipv6]
@@ -124,37 +111,37 @@ class DnsLookupTool(Tool):
         total = len(ipv4) + len(ipv6)
         return ToolResult(
             status=ToolStatus.SUCCESS,
-            summary=f"{total} address(es) found for {hostname}",
+            summary=tr("dns.summary.found", count=total, host=hostname),
             data=data,
             raw_output="\n".join(raw_lines),
         )
 
     def _run_for_ip(self, ip: str, include_reverse: bool) -> ToolResult:
-        data = [("Query", [("IP address", ip)])]
+        data = [(tr("dns.section.query"), [(tr("dns.ip_address"), ip)])]
         raw_lines = [f"ip: {ip}"]
 
         if include_reverse:
             try:
-                with ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(socket.gethostbyaddr, ip)
-                    primary, aliases, _addresses = future.result(timeout=_DNS_TIMEOUT)
-                data.append(
-                    ("Reverse Lookup (PTR)", [("Host name", primary)] + [
-                        (f"Alias {i + 1}", alias) for i, alias in enumerate(aliases)
-                    ])
+                primary, aliases, _addresses = _resolve_with_timeout(
+                    socket.gethostbyaddr, ip, _DNS_TIMEOUT
                 )
+                rows = [(tr("dns.host_name"), primary)]
+                rows += [
+                    (tr("dns.alias", index=i + 1), alias) for i, alias in enumerate(aliases)
+                ]
+                data.append((tr("dns.section.ptr"), rows))
                 raw_lines.append(f"ptr: {primary}")
                 raw_lines.extend(f"alias: {alias}" for alias in aliases)
             except FutureTimeout:
-                data.append(("Reverse Lookup (PTR)", [("Status", "Timed out")]))
+                data.append((tr("dns.section.ptr"), [(tr("dns.status"), tr("dns.ptr_timeout"))]))
                 raw_lines.append("ptr: <timeout>")
             except (socket.herror, socket.gaierror, OSError):
-                data.append(("Reverse Lookup (PTR)", [("Status", "No PTR record found")]))
+                data.append((tr("dns.section.ptr"), [(tr("dns.status"), tr("dns.no_ptr"))]))
                 raw_lines.append("ptr: <none>")
 
         return ToolResult(
             status=ToolStatus.SUCCESS,
-            summary=f"Processed IP address {ip}",
+            summary=tr("dns.summary.ip", ip=ip),
             data=data,
             raw_output="\n".join(raw_lines),
         )

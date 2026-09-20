@@ -65,6 +65,7 @@ QFrame[rule="true"] {{
 /* ---- status dots ---- */
 QLabel[dot="ok"]      {{ color: #d7d9dc; }}
 QLabel[dot="planned"] {{ color: #6c7075; }}
+QLabel[dot="warn"]    {{ color: #d9c08b; }}
 QLabel[dot="error"]   {{ color: #d98b8b; }}
 
 /* ---- input widgets ---- */
@@ -137,6 +138,75 @@ QScrollBar::handle:horizontal {{
     min-width: 30px;
 }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+
+/* ---- combo boxes and spin boxes ---- */
+QComboBox {{
+    padding: 6px 9px;
+}}
+QComboBox::drop-down {{
+    border: none;
+    width: 26px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: {C_PANEL};
+    border: 1px solid {C_BORDER};
+    selection-background-color: {C_CARD};
+    selection-color: {C_TEXT};
+    outline: none;
+}}
+QSpinBox {{
+    padding: 6px 9px;
+}}
+QSpinBox::up-button, QSpinBox::down-button {{
+    background-color: #26292d;
+    border: none;
+    width: 20px;
+}}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+    background-color: #2f3338;
+}}
+
+/* ---- tables (result sections) ---- */
+QTreeWidget {{
+    background-color: #191b1d;
+    border: 1px solid {C_BORDER};
+    border-radius: 4px;
+    alternate-background-color: #1d1f22;
+    show-decoration-selected: 0;
+}}
+QTreeWidget::item {{
+    padding: 3px 4px;
+}}
+QTreeWidget::item:selected {{
+    background-color: #2c2f34;
+}}
+QHeaderView::section {{
+    background-color: {C_PANEL};
+    color: {C_MUTED};
+    border: none;
+    border-bottom: 1px solid {C_BORDER};
+    padding: 6px 8px;
+    font-weight: 600;
+}}
+
+/* ---- notice cards (warnings, info banners) ---- */
+QFrame[notice="true"] {{
+    background-color: #26221c;
+    border: 1px solid #4d4030;
+    border-radius: 6px;
+}}
+QFrame[notice="true"] QLabel {{
+    background-color: transparent;
+}}
+
+/* ---- version chip ---- */
+QLabel[chip="true"] {{
+    background-color: {C_CARD};
+    border: 1px solid {C_BORDER};
+    border-radius: 9px;
+    padding: 2px 10px;
+    color: {C_MUTED};
+}}
 
 /* ---- status bar ---- */
 QStatusBar {{ background-color: {C_PANEL}; color: {C_MUTED}; }}

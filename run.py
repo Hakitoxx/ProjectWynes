@@ -27,11 +27,17 @@ def main() -> int:
         action="store_true",
         help="Create the main window and exit immediately (used by automated checks).",
     )
+    parser.add_argument(
+        "--lang",
+        choices=["tr", "en"],
+        default="",
+        help="Force the UI language for this run (does not persist).",
+    )
     args = parser.parse_args()
 
     from wynes.app import run
 
-    return run(smoke_test=args.smoke_test)
+    return run(smoke_test=args.smoke_test, lang=args.lang)
 
 
 if __name__ == "__main__":
