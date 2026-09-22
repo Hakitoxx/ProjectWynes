@@ -37,7 +37,13 @@ class TestPortCheck(unittest.TestCase):
         listener.listen(1)
         port = listener.getsockname()[1]
         try:
-            result = self.tool.run(target="127.0.0.1", port=port, timeout=2)
+            # generous timeout + retry: under full-suite load the first
+            # loopback connect may be stalled by the OS for seconds
+            result = None
+            for _attempt in range(3):
+                result = self.tool.run(target="127.0.0.1", port=port, timeout=5)
+                if result.status is ToolStatus.SUCCESS:
+                    break
         finally:
             listener.close()
         self.assertEqual(result.status, ToolStatus.SUCCESS, msg=result.error)

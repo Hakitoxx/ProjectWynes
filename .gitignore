@@ -7,7 +7,7 @@ venv/
 # Packaging / build output
 build/
 dist/
-*.spec
+
 
 # IDE / editor
 .idea/

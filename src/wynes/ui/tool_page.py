@@ -47,7 +47,14 @@ class _ToolWorker(QRunnable):
         self._inputs = inputs
 
     def run(self) -> None:
-        self.signals.finished.emit(guard_exceptions(self._tool.run, **self._inputs))
+        result = guard_exceptions(self._tool.run, **self._inputs)
+        try:
+            self.signals.finished.emit(result)
+        except RuntimeError:
+            # The page (and its signal source) was deleted while the tool was
+            # still running — e.g. a language rebuild. The result is obsolete
+            # and intentionally dropped.
+            pass
 
 
 class ToolPage(QWidget):
@@ -247,6 +254,7 @@ class ToolPage(QWidget):
 
         worker = _ToolWorker(self._tool, inputs)
         worker.signals.finished.connect(self._on_finished)
+        self._worker = worker  # keep the Python object alive while it runs
         QThreadPool.globalInstance().start(worker)
 
     def _on_finished(self, result: ToolResult) -> None:

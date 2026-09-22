@@ -1,0 +1,34 @@
+# Windows version-resource metadata for the packaged executable.
+# Referenced by packaging/projectwynes.spec. Keep versions in sync with
+# src/wynes/__init__.py (currently 1.2.0).
+
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        filevers=(1, 2, 0, 0),
+        prodvers=(1, 2, 0, 0),
+        mask=0x3F,
+        flags=0x0,
+        OS=0x40004,
+        fileType=0x1,
+        subtype=0x0,
+        date=(0, 0),
+    ),
+    kids=[
+        StringFileInfo([
+            StringTable(
+                "040904B0",
+                [
+                    StringStruct("CompanyName", "Project Wynes"),
+                    StringStruct("FileDescription", "Project Wynes — Diagnostics Toolkit"),
+                    StringStruct("FileVersion", "1.2.0"),
+                    StringStruct("InternalName", "projectwynes"),
+                    StringStruct("OriginalFilename", "projectwynes.exe"),
+                    StringStruct("ProductName", "Project Wynes"),
+                    StringStruct("ProductVersion", "1.2.0"),
+                    StringStruct("LegalCopyright", "MIT License"),
+                ],
+            )
+        ]),
+        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+    ],
+)

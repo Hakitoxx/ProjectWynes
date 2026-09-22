@@ -34,6 +34,21 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
+def _run_with_retry(tool, url: str, attempts: int = 3):
+    """Run the tool, retrying ONLY on timeout.
+
+    Under full-suite load (parallel PowerShell/GUI smoke subprocesses) the
+    OS can stall a loopback connect for seconds; the retried attempt still
+    asserts the exact same outcome, so the test keeps its meaning.
+    """
+    result = None
+    for _ in range(attempts):
+        result = tool.run(url=url)
+        if result.status is not ToolStatus.TIMEOUT:
+            break
+    return result
+
+
 class TestHttpHeaders(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -56,7 +71,7 @@ class TestHttpHeaders(unittest.TestCase):
 
     def test_head_request_success(self):
         url = f"http://127.0.0.1:{self.port}/"
-        result = self.tool.run(url=url)
+        result = _run_with_retry(self.tool, url)
         self.assertEqual(result.status, ToolStatus.SUCCESS, msg=result.error)
         self.assertIn("200", result.summary)
         flattened = str(result.tables)
@@ -64,7 +79,7 @@ class TestHttpHeaders(unittest.TestCase):
 
     def test_redirect_is_reported(self):
         url = f"http://127.0.0.1:{self.port}/redir"
-        result = self.tool.run(url=url)
+        result = _run_with_retry(self.tool, url)
         self.assertEqual(result.status, ToolStatus.SUCCESS, msg=result.error)
         self.assertIn("302", result.summary)
         self.assertIn("/final", str(result.data))

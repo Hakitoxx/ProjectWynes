@@ -1,134 +1,188 @@
+<!-- Banner: place the project banner at docs/images/banner.png and reference it here. -->
+
 # Project Wynes
 
-**Version 1.2.0**
+**Version 1.2.0** — Modern Windows desktop toolkit for defensive network and system diagnostics.
 
-A minimalist desktop toolkit for defensive network and system diagnostics.
-Wynes bundles focused diagnostic tools behind one clean, bilingual
-(Türkçe / English) desktop interface — a "Swiss Army knife" for authorized
-troubleshooting, learning and administration.
+Python + PySide6 + Windows · Türkçe & English UI · MIT License
 
-> **Scope:** Wynes is a defensive diagnostic tool. Use it only on systems
-> and networks you own or are explicitly authorized to inspect. It contains
-> no exploit, credential-theft, persistence or attack-automation
-> functionality.
+Project Wynes puts everyday diagnostic work — DNS, ping, traceroute, port
+checks, HTTP/TLS inspection, Nmap scans, system and process information,
+file hashing — into one clean desktop application, instead of a dozen tabs
+of terminals and memorized command flags.
+
+> **Authorized use only.** Wynes is a defensive diagnostic tool for systems
+> and networks you own or are explicitly permitted to inspect. It contains
+> no exploitation, credential-theft or attack-automation functionality.
+
+## Screenshots
+
+<!-- Screenshots are added by the maintainer. Place files in docs/images/
+     and link them here, e.g. ![Dashboard](docs/images/dashboard.png) -->
+
+*Screenshots will be added to `docs/images/`.*
 
 ## Features
 
 | Category | Tool | What it does |
 |---|---|---|
-| Network | **DNS Lookup** | Forward (A/AAAA) and reverse (PTR) resolution via the system resolver |
-| Network | **Ping** | Reachability, packet and RTT statistics via the system ping (locale-proof parsing) |
-| Network | **Traceroute** | Hop-by-hop route via the system tracert/traceroute with per-hop timing |
-| Network | **Port Check** | Single TCP connect test with state explanation (open/closed/filtered/DNS) |
-| Network | **HTTP Headers** | HEAD-based header inspection; redirect reporting; no content download |
-| Network | **TLS / Certificate** | Handshake, negotiated protocol/cipher, certificate chain details, verification status |
-| Network | **Nmap Scan** | Safe profiles via the official Nmap CLI (see below) |
-| System | **System Information** | OS, hardware, memory, runtime, uptime |
-| System | **Network Information** | Adapters, IPv4/IPv6, MAC, link state, gateways, DNS servers |
-| System | **Process List** | Read-only process table (PID, name, memory, path), filterable |
-| Files | **File Hash** | SHA-256/SHA-512/SHA-1/MD5 with stream processing (local only) |
+| Network | DNS Lookup | Forward (A/AAAA) + reverse (PTR) resolution |
+| Network | Ping | Reachability with packet/RTT statistics (locale-proof parsing) |
+| Network | Traceroute | Hop-by-hop path with per-hop timing |
+| Network | Port Check | Single-port TCP connectivity with clear states |
+| Network | HTTP Headers | HEAD-based header inspection, redirect info, no body download |
+| Network | TLS / Certificate | Handshake, cipher, certificate details, verification status |
+| Network | Nmap Scan | Safe profiles via the official Nmap executable (optional) |
+| System | System Information | OS, hardware, memory, runtime, uptime |
+| System | Network Information | Adapters, IPv4/IPv6, MAC, gateways, DNS servers |
+| System | Process List | Read-only process table (PID, name, memory, path) |
+| Files | File Hash | SHA-256/SHA-512/SHA-1/MD5, streamed, fully local |
 
-Plus: **Dashboard** with tool availability overview and quick access,
-**Settings** (language, Nmap path), **About**, localized validation and
-error messages, raw-output sections for technical detail.
+Plus: bilingual UI (Türkçe default / English, switchable live in Settings),
+dark professional theme, structured results with raw output available, and
+a dashboard with tool availability.
 
-## Localization
+## Windows Installation
 
-The entire UI is bilingual: **Türkçe** (default) and **English**.
-On first launch a language dialog is shown; the choice is persisted and
-can be changed anytime in *Settings*. All UI text lives centrally in
-`src/wynes/locale/` (`tr.py`, `en.py`) — no language conditionals are
-scattered through the code.
+### Method 1 — PowerShell Installation
 
-## Requirements
+Installs the standalone executable for the current Windows user. **No
+Python needed.** No admin rights needed.
 
-- Windows 10/11 (primary target; the code itself is largely cross-platform)
-- Python 3.11+ (developed on 3.14)
-- [Nmap](https://nmap.org/) — **optional**, only needed for the Nmap tool
+1. Open **PowerShell** (Windows key → type `powershell` → Enter).
+2. Run:
 
-## Installation
+   ```powershell
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Hakitoxx/ProjectWynes/main/install.ps1" -OutFile "$env:TEMP\wynes-install.ps1"
+   powershell -ExecutionPolicy Bypass -File "$env:TEMP\wynes-install.ps1"
+   ```
+
+   The installer downloads the official release package, verifies its
+   SHA-256 checksum, installs to `%LOCALAPPDATA%\ProjectWynes`, and adds
+   the launcher to your **user** PATH (never overwriting it).
+3. **Close and reopen** the terminal (PATH changes apply to new terminals).
+4. From **any** directory, run:
+
+   ```cmd
+   projectwynes
+   ```
+
+Project Wynes opens.
+
+To remove it later:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\ProjectWynes\uninstall.ps1"
+```
+
+### Method 2 — GitHub ZIP
+
+Runs from the source tree. Requires **Python 3.11+**; does **not** modify
+your PATH or anything outside the folder.
+
+1. Open the repository → **Code → Download ZIP**.
+2. Extract the ZIP.
+3. Open the extracted `ProjectWynes-main` folder and run the setup:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File setup.ps1
+   ```
+
+4. Open a **CMD** window in that same folder (`File → Open command prompt`
+   in Explorer, or `cmd` in the address bar) and type:
+
+   ```cmd
+   projectwynes
+   ```
+
+   (In PowerShell: `.\projectwynes.cmd`.)
+
+Project Wynes opens.
+
+### Security notes on installation
+
+- Downloads come only from the official repository
+  (`github.com/Hakitoxx/ProjectWynes`) over HTTPS.
+- The PowerShell installer verifies the package's SHA-256 checksum before
+  installing and fails safely on any mismatch.
+- You are encouraged to read `install.ps1` before running it.
+- Nmap is **not** bundled; install it from the official
+  <https://nmap.org> site if you want the Nmap tool. Without it, Wynes
+  works fully and simply marks that tool as unavailable.
+
+## Developer setup
 
 ```powershell
 git clone https://github.com/Hakitoxx/ProjectWynes.git
 cd ProjectWynes
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-## Running
-
-```powershell
 .\.venv\Scripts\python.exe run.py
 ```
 
-Useful flags: `--smoke-test` (headless startup check), `--lang tr|en`
-(force language for one run).
+Useful flags: `run.py --smoke-test` (headless startup check),
+`run.py --lang tr|en` (force language for one run).
 
-## Tests
+### Tests
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The suite covers localization key parity, validators, command construction
-and output parsing (ping/traceroute/Nmap), loopback-based port/HTTP/TLS
-checks, hashing, system/network/process enumeration and headless GUI
-smoke tests in both languages. Nmap-dependent tests skip automatically
-when Nmap is not installed.
+Deterministic suite: localization key parity, validators, command
+construction and output parsing, loopback-based port/HTTP/TLS checks,
+hashing, system/network/process enumeration, and headless GUI smoke tests
+in both languages. Nmap-dependent tests skip when Nmap is absent.
 
-## Nmap integration
+### Building the executable
 
-Wynes uses the **official Nmap executable** (never bundled source):
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm packaging\projectwynes.spec
+```
 
-- Detection order: custom path from Settings → `PATH` → default install
-  locations (`C:\Program Files (x86)\Nmap`, `C:\Program Files\Nmap`)
-- Version detection via `nmap --version`
-- Execution with argument lists (no shell, no string concatenation),
-  timeouts and robust console-output decoding
-- Deliberately limited profiles: host discovery (`-sn`), quick TCP scan
-  (`-sT`), service detection (`-sV`); targets limited to single hosts or
-  CIDR ranges of /24 at most — **no** exploit scripts, no OS
-  fingerprinting, no mass scanning
-- If Nmap is missing, the tool page explains how to install it instead of
-  failing
+Output: `dist\projectwynes.exe` (single windowed executable).
 
 ## Project structure
 
 ```
-run.py                  Entry point (--smoke-test, --lang)
-requirements.txt        Single dependency: PySide6
+run.py                    Entry point (--smoke-test, --lang)
+projectwynes.cmd          Local launcher (Method 2)
+setup.ps1                 Local setup for the ZIP method
+install.ps1               PowerShell installer (Method 1)
+uninstall.ps1             Removes a Method 1 installation
+packaging/                PyInstaller spec + Windows version info
+docs/images/              Screenshots/banner (added by maintainer)
+requirements.txt          Runtime dependency: PySide6
+requirements-dev.txt      Packaging toolchain
 src/wynes/
-  app.py                Bootstrap, first-launch language flow
-  core/
-    i18n.py             Central localization runtime (tr(), listeners)
-    validators.py       Shared input validation (host/port/URL/file)
-    tool_base.py        Tool contract, ToolResult, InputField, TableData
-    tool_manager.py     Tool registry + availability cache
-    process.py          Safe external-process execution + console decoding
-    settings.py         QSettings persistence
-  locale/               tr.py / en.py string tables
-  tools/                One module per diagnostic tool
-  ui/                   main_window, dashboard, tool_page, outputs,
-                        settings_page, about_page, first_launch, theme
-tests/                  unittest suite (deterministic, loopback-based)
+  app.py                  Bootstrap + first-launch language flow
+  core/                   i18n, validators, tool contracts, registry,
+                          safe process execution, settings
+  locale/                 tr.py / en.py string tables
+  tools/                  One module per diagnostic tool
+  ui/                     main_window, dashboard, tool_page, outputs,
+                          settings_page, about_page, first_launch, theme
+tests/                    unittest suite
 ```
 
-## Security & privacy notes
+## Contributing
 
-- External processes run without a shell, with argument lists and timeouts.
-- Console output is decoded code-page-safely; no raw tracebacks reach the UI.
-- User input is validated before any process or network operation
-  (including command-line-injection guards).
-- File hashing is fully local; process/system/network info never leaves
-  the machine; external traffic happens only when *you* run an HTTP/TLS/
-  Nmap diagnostic.
-- No secrets, tokens or credentials are stored or committed (`.gitignore`
-  covers `.env` files and key material).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Please report vulnerabilities privately via
+GitHub's "Report a vulnerability" feature.
 
 ## Limitations
 
-- Nmap features require a separately installed Nmap.
+- Windows is the primary target; the diagnostic logic is largely portable
+  but the packaging and installer are Windows-specific.
 - Process details for protected/system processes require running Wynes as
-  administrator (reported transparently, not hidden).
-- Windows Northern-Europe-style console quirks are handled, but ping and
-  tracert parsing focuses on the protocol-stable parts of their output.
+  administrator — shown transparently, never silently dropped.
+- Nmap features require a separately installed Nmap.
+
+## License
+
+[MIT](LICENSE)
