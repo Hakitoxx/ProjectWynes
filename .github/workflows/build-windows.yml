@@ -25,19 +25,26 @@ jobs:
         run: |
           python -m unittest discover -s tests -v 2>&1 | Tee-Object -FilePath test.log
           $code = $LASTEXITCODE
-          # surface failing test names AND their final error line as
+          # surface failing test names AND their traceback tail as
           # annotations (visible on the public run page)
           $lines = Get-Content test.log
-          for ($i = 0; $i -lt $lines.Count; $i++) {
-            if ($lines[$i] -match "^(FAIL|ERROR): (.+?)( \(|$)") {
-              $name = $Matches[2]
-              $detail = ""
-              for ($j = $i + 1; $j -lt $lines.Count -and $lines[$j] -notmatch "^-{10,}$"; $j++) {
-                if ($lines[$j].Trim()) { $detail = $lines[$j].Trim() }
+          $state = "idle"; $name = ""; $detail = ""
+          foreach ($line in $lines) {
+            if ($line -match "^(FAIL|ERROR): (.+?)( \(|$)") {
+              $name = $Matches[2]; $state = "dash1"; $detail = ""
+            } elseif ($state -ne "idle" -and $line -match "^-{10,}$") {
+              if ($state -eq "collect") {
+                $clean = ($detail -replace "[^\x20-\x7E]", "") -replace "[:%\[\]]", " "
+                Write-Output ("::error title=Test failure::{0}  [{1}]" -f $name, $clean)
               }
-              $detail = $detail -replace "[:%\r\n\[\]]", " "
-              Write-Output ("::error title=Test failure::{0}  [{1}]" -f $name, $detail)
+              $state = "collect"; $detail = ""
+            } elseif ($state -eq "collect" -and $line.Trim()) {
+              $detail = $line.Trim()  # keeps the LAST non-empty line of the traceback
             }
+          }
+          if ($state -eq "collect" -and $name) {
+            $clean = ($detail -replace "[^\x20-\x7E]", "") -replace "[:%\[\]]", " "
+            Write-Output ("::error title=Test failure::{0}  [{1}]" -f $name, $clean)
           }
           exit $code
 
