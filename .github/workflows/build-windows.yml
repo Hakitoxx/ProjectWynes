@@ -25,9 +25,20 @@ jobs:
         run: |
           python -m unittest discover -s tests -v 2>&1 | Tee-Object -FilePath test.log
           $code = $LASTEXITCODE
-          $fails = Select-String -Path test.log -Pattern "^(FAIL|ERROR): (.+?)( \(|$)" |
-            ForEach-Object { $_.Matches[0].Groups[2].Value }
-          foreach ($f in $fails) { Write-Output "::error title=Test failure::$f" }
+          # surface failing test names AND their final error line as
+          # annotations (visible on the public run page)
+          $lines = Get-Content test.log
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match "^(FAIL|ERROR): (.+?)( \(|$)") {
+              $name = $Matches[2]
+              $detail = ""
+              for ($j = $i + 1; $j -lt $lines.Count -and $lines[$j] -notmatch "^-{10,}$"; $j++) {
+                if ($lines[$j].Trim()) { $detail = $lines[$j].Trim() }
+              }
+              $detail = $detail -replace "[:%\r\n\[\]]", " "
+              Write-Output ("::error title=Test failure::{0}  [{1}]" -f $name, $detail)
+            }
+          }
           exit $code
 
   build:

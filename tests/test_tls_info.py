@@ -33,7 +33,23 @@ def _find_openssl() -> str:
     return ""
 
 
+def _openssl_cli_works(binary: str) -> bool:
+    """The fixture below needs a *functional* OpenSSL CLI (some CI images
+    ship one whose config/sandbox is broken). Probe cheaply; skip the
+    integration test when the CLI itself is not usable."""
+    if not binary:
+        return False
+    try:
+        completed = subprocess.run(
+            [binary, "version"], capture_output=True, timeout=20
+        )
+        return completed.returncode == 0 and bool(completed.stdout.strip())
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 OPENSSL = _find_openssl()
+OPENSSL_WORKS = _openssl_cli_works(OPENSSL)
 
 
 class TestTlsValidation(unittest.TestCase):
@@ -53,7 +69,8 @@ class TestTlsValidation(unittest.TestCase):
         self.assertFalse(result.ok)
 
 
-@unittest.skipUnless(OPENSSL, "OpenSSL CLI not available on this machine")
+@unittest.skipUnless(OPENSSL_WORKS,
+                     "No functional OpenSSL CLI on this machine (integration fixture)")
 class TestTlsWithLocalServer(unittest.TestCase):
     def test_self_signed_cert_is_reported_as_unverified_with_details(self):
         # retry: s_server startup on a busy/headless runner can be slow
@@ -72,12 +89,17 @@ class TestTlsWithLocalServer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             key = Path(tmp) / "key.pem"
             cert = Path(tmp) / "cert.pem"
-            subprocess.run(
-                [OPENSSL, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-                 "-keyout", str(key), "-out", str(cert), "-days", "1",
-                 "-subj", "/CN=localhost"],
-                check=True, capture_output=True,
-            )
+            try:
+                subprocess.run(
+                    [OPENSSL, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                     "-keyout", str(key), "-out", str(cert), "-days", "1",
+                     "-subj", "/CN=localhost"],
+                    check=True, capture_output=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                raise unittest.SkipTest(
+                    f"openssl failed to mint a self-signed cert in this environment: {exc}"
+                )
             probe = socket.socket()
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
