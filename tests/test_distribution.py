@@ -84,10 +84,18 @@ class TestReadmeClaims(unittest.TestCase):
         self.assertIn("uninstall.ps1", self.readme)
 
     def test_no_fake_screenshot_links(self):
-        # image references must point at docs/images (the documented place)
+        # Local image references must point at docs/images (the documented
+        # placeholder location); external https images (shields badges etc.)
+        # are fine — they render or fail independently of the repo.
         for match in re.finditer(r"!\[[^\]]*\]\(([^)]+)\)", self.readme):
-            self.assertTrue(match.group(1).startswith("docs/images/"),
+            target = match.group(1)
+            if target.startswith(("http://", "https://")):
+                continue
+            self.assertTrue(target.startswith("docs/images/") or target.startswith("./docs/images/"),
                             msg=match.group(0))
+
+    def test_version_badge_matches_package(self):
+        self.assertIn(f"version-{__version__}", self.readme)
 
 
 class TestLocalLauncher(unittest.TestCase):
