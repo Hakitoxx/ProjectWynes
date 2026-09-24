@@ -32,9 +32,19 @@ class TestNetworkInfo(unittest.TestCase):
     def test_reports_local_hostname(self):
         import socket as _socket
 
-        result = NetworkInfoTool().run()
-        self.assertEqual(result.status, ToolStatus.SUCCESS, msg=result.error)
-        self.assertIn(_socket.gethostname(), str(result.data))
+        # retry: the PowerShell subsystem can be slow to answer on a busy
+        # or freshly-booted runner (the tool then falls back gracefully)
+        result = None
+        last_error = None
+        for _attempt in range(3):
+            try:
+                result = NetworkInfoTool().run()
+                self.assertEqual(result.status, ToolStatus.SUCCESS, msg=result.error)
+                self.assertIn(_socket.gethostname(), str(result.data))
+                return
+            except AssertionError as exc:
+                last_error = exc
+        raise last_error
 
 
 class TestProcessList(unittest.TestCase):

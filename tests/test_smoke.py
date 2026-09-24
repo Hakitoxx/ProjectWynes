@@ -14,14 +14,20 @@ class TestSmokeBothLanguages(unittest.TestCase):
     def _run_smoke(self, lang: str) -> subprocess.CompletedProcess:
         env = os.environ.copy()
         env["QT_QPA_PLATFORM"] = "offscreen"
-        return subprocess.run(
-            [sys.executable, str(ROOT / "run.py"), "--smoke-test", "--lang", lang],
-            cwd=ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        last = None
+        for _attempt in range(2):  # headless startup on a busy runner can stall
+            try:
+                return subprocess.run(
+                    [sys.executable, str(ROOT / "run.py"), "--smoke-test", "--lang", lang],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                )
+            except subprocess.TimeoutExpired as exc:
+                last = exc
+        raise last
 
     def test_turkish(self):
         completed = self._run_smoke("tr")

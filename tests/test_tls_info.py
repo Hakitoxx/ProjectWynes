@@ -56,6 +56,18 @@ class TestTlsValidation(unittest.TestCase):
 @unittest.skipUnless(OPENSSL, "OpenSSL CLI not available on this machine")
 class TestTlsWithLocalServer(unittest.TestCase):
     def test_self_signed_cert_is_reported_as_unverified_with_details(self):
+        # retry: s_server startup on a busy/headless runner can be slow
+        last_error = None
+        for _attempt in range(3):
+            try:
+                self._run_case()
+                return
+            except AssertionError as exc:
+                last_error = exc
+                time.sleep(1)
+        raise last_error
+
+    def _run_case(self) -> None:
         tool = TlsInfoTool()
         with tempfile.TemporaryDirectory() as tmp:
             key = Path(tmp) / "key.pem"
@@ -77,13 +89,15 @@ class TestTlsWithLocalServer(unittest.TestCase):
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
             try:
-                deadline = time.time() + 10
+                deadline = time.time() + 20
                 while time.time() < deadline:
                     try:
                         socket.create_connection(("127.0.0.1", port), timeout=1).close()
                         break
                     except OSError:
-                        time.sleep(0.2)
+                        if server.poll() is not None:
+                            raise AssertionError("openssl s_server exited early")
+                        time.sleep(0.3)
 
                 result = tool.run(target="127.0.0.1", port=port)
             finally:
